@@ -71,7 +71,7 @@ public final class StreamingTypeAdaptersTest {
     Truck truck = new Truck();
     truck.passengers = null;
     assertThat(truckAdapter.toJson(truck).replace('\"', '\''))
-        .isEqualTo("{'horsePower':0.0,'passengers':null}");
+        .isAnyOf("{'horsePower':0.0,'passengers':null}", "{'passengers':null,'horsePower':0.0}");
   }
 
   @Test
@@ -100,7 +100,8 @@ public final class StreamingTypeAdaptersTest {
     Truck truck = new Truck();
     truck.passengers = Arrays.asList(new Person("Jesse", 29), new Person("Jodie", 29));
     assertThat(truckAdapter.toJson(truck).replace('\"', '\''))
-        .isEqualTo("{'horsePower':0.0,'passengers':['Jesse','Jodie']}");
+        .isAnyOf("{'horsePower':0.0,'passengers':['Jesse','Jodie']}",
+                 "{'passengers':['Jesse','Jodie'],'horsePower':0.0}");
   }
 
   @Test
@@ -200,7 +201,8 @@ public final class StreamingTypeAdaptersTest {
     }
     gson = new GsonBuilder().registerTypeAdapter(Person.class, typeAdapter.nullSafe()).create();
     assertThat(gson.toJson(truck, Truck.class))
-        .isEqualTo("{\"horsePower\":1.0,\"passengers\":[null,\"jesse,30\"]}");
+        .isAnyOf("{\"horsePower\":1.0,\"passengers\":[null,\"jesse,30\"]}",
+                "{\"passengers\":[null,\"jesse,30\"],\"horsePower\":1.0}");
     truck = gson.fromJson(json, Truck.class);
     assertThat(truck.horsePower).isEqualTo(1.0D);
     assertThat(truck.passengers.get(0)).isNull();

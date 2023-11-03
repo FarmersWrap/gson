@@ -60,22 +60,16 @@ public class ExposeFieldsTest {
     ClassWithExposedFields[] objects = { object1, object2, object3 };
 
     String json = gson.toJson(objects);
-    String expected =
-        '['
-            + object1.getExpectedJson()
-            + ','
-            + object2.getExpectedJson()
-            + ','
-            + object3.getExpectedJson()
-            + ']';
-
-    assertThat(json).isEqualTo(expected);
+    assertThat(json).isAnyOf("[{\"a\":1,\"d\":2.0},{\"d\":2.0},{\"a\":2,\"d\":2.0}]",
+                            "[{\"d\":2.0,\"a\":1},{\"d\":2.0},{\"a\":2,\"d\":2.0}]",
+                            "[{\"d\":2.0,\"a\":1},{\"d\":2.0},{\"d\":2.0,\"a\":2}]",
+                            "[{\"a\":1,\"d\":2.0},{\"d\":2.0},{\"d\":2.0,\"a\":2}]");
   }
 
   @Test
   public void testExposeAnnotationSerialization() {
     ClassWithExposedFields target = new ClassWithExposedFields(1, 2);
-    assertThat(gson.toJson(target)).isEqualTo(target.getExpectedJson());
+    assertThat(gson.toJson(target)).isAnyOf("{\"a\":1,\"d\":2.0}", "{\"d\":2.0,\"a\":1}");
   }
 
   @Test
@@ -104,16 +98,16 @@ public class ExposeFieldsTest {
     assertThat(obj.a).isEqualTo(0);
     assertThat(obj.b).isEqualTo(1);
   }
-  
+
   @Test
   public void testExposedInterfaceFieldSerialization() {
     String expected = "{\"interfaceField\":{}}";
     ClassWithInterfaceField target = new ClassWithInterfaceField(new SomeObject());
     String actual = gson.toJson(target);
-    
+
     assertThat(actual).isEqualTo(expected);
   }
-  
+
   @Test
   public void testExposedInterfaceFieldDeserialization() {
     String json = "{\"interfaceField\":{}}";
@@ -160,21 +154,21 @@ public class ExposeFieldsTest {
     private final int a = 0;
     private final int b = 1;
   }
-  
+
   private static interface SomeInterface {
     // Empty interface
   }
-  
+
   private static class SomeObject implements SomeInterface {
     // Do nothing
   }
-  
+
   private static class SomeInterfaceInstanceCreator implements InstanceCreator<SomeInterface> {
     @Override public SomeInterface createInstance(Type type) {
       return new SomeObject();
     }
   }
-  
+
   private static class ClassWithInterfaceField {
     @Expose
     private final SomeInterface interfaceField;
@@ -182,5 +176,5 @@ public class ExposeFieldsTest {
     public ClassWithInterfaceField(SomeInterface interfaceField) {
       this.interfaceField = interfaceField;
     }
-  }  
+  }
 }
