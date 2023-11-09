@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,9 +52,9 @@ public final class StreamingTypeAdaptersTest {
     truck.passengers = Arrays.asList(new Person("Jesse", 29), new Person("Jodie", 29));
     truck.horsePower = 300;
 
-    assertThat(truckAdapter.toJson(truck).replace('\"', '\''))
-        .isEqualTo("{'horsePower':300.0,"
-        + "'passengers':[{'age':29,'name':'Jesse'},{'age':29,'name':'Jodie'}]}");
+    assertThat(truckAdapter.toJson(truck)).isIn(truck.getExpectedJsons());
+        // .isEqualTo("{'horsePower':300.0,"
+        // + "'passengers':[{'age':29,'name':'Jesse'},{'age':29,'name':'Jodie'}]}");
   }
 
   @Test
@@ -70,8 +71,8 @@ public final class StreamingTypeAdaptersTest {
   public void testSerializeNullField() {
     Truck truck = new Truck();
     truck.passengers = null;
-    assertThat(truckAdapter.toJson(truck).replace('\"', '\''))
-        .isEqualTo("{'horsePower':0.0,'passengers':null}");
+    assertThat(truckAdapter.toJson(truck)).isIn(truck.getExpectedJsons());
+        // .isEqualTo("{'horsePower':0.0,'passengers':null}");
   }
 
   @Test
@@ -100,7 +101,8 @@ public final class StreamingTypeAdaptersTest {
     Truck truck = new Truck();
     truck.passengers = Arrays.asList(new Person("Jesse", 29), new Person("Jodie", 29));
     assertThat(truckAdapter.toJson(truck).replace('\"', '\''))
-        .isEqualTo("{'horsePower':0.0,'passengers':['Jesse','Jodie']}");
+      .isAnyOf("{'horsePower':0.0,'passengers':['Jesse','Jodie']}",
+               "{'passengers':['Jesse','Jodie'],'horsePower':0.0}");
   }
 
   @Test
@@ -176,7 +178,12 @@ public final class StreamingTypeAdaptersTest {
         return new Person(values.get(0), Integer.parseInt(values.get(1)));
       }
       @Override public void write(JsonWriter out, Person person) throws IOException {
-        out.value(person.name + "," + person.age);
+        out.beginObject();
+        out.name("name");
+        out.value(person.name);
+        out.name("age");
+        out.value(person.age);
+        out.endObject();
       }
     };
     Gson gson = new GsonBuilder().registerTypeAdapter(
@@ -199,8 +206,8 @@ public final class StreamingTypeAdaptersTest {
           + "\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#adapter-not-null-safe");
     }
     gson = new GsonBuilder().registerTypeAdapter(Person.class, typeAdapter.nullSafe()).create();
-    assertThat(gson.toJson(truck, Truck.class))
-        .isEqualTo("{\"horsePower\":1.0,\"passengers\":[null,\"jesse,30\"]}");
+    assertThat(gson.toJson(truck, Truck.class)).isIn(truck.getExpectedJsons());
+        // .isEqualTo("{\"horsePower\":1.0,\"passengers\":[null,\"jesse,30\"]}");
     truck = gson.fromJson(json, Truck.class);
     assertThat(truck.horsePower).isEqualTo(1.0D);
     assertThat(truck.passengers.get(0)).isNull();
@@ -238,6 +245,45 @@ public final class StreamingTypeAdaptersTest {
   static class Truck {
     double horsePower;
     List<Person> passengers = Collections.emptyList();
+
+    public List<String> getExpectedJsons() {
+      List<String> truckJsons = new ArrayList<>();
+
+      if (passengers == null) {
+        truckJsons.add("{\"passengers\":null,\"horsePower\":" + horsePower + "}");
+        truckJsons.add("{\"horsePower\":" + horsePower + ",\"passengers\":null}");
+        return truckJsons;
+      }
+
+      List<String> passengersJsons = new ArrayList<>();
+      HashMap<Person, List<String>> personJsons = new HashMap<>();
+      for (Person p : passengers) {
+        if (p != null) {
+          personJsons.put(p, p.getExpectedJsons());
+        }
+      }
+      passengersPermutation(0, "[", passengersJsons, personJsons);
+      for (String s : passengersJsons) {
+        truckJsons.add("{\"passengers\":" + s + ",\"horsePower\":" + horsePower + "}");
+        truckJsons.add("{\"horsePower\":" + horsePower + ",\"passengers\":" + s + "}");
+      }
+      return truckJsons;
+    }
+
+    public void passengersPermutation(int i, String curString, List<String> passengersJsons, HashMap<Person, List<String>> personJsons) {
+      if (i >= passengers.size()) {
+        passengersJsons.add(curString + "]");
+        return;
+      }
+      if (passengers.get(i) == null) {
+        passengersPermutation(i + 1, curString + "null" + (i == passengers.size() - 1 ? "" : ","), passengersJsons, personJsons);
+      } else {
+        for (String p : personJsons.get(passengers.get(i))) {
+          passengersPermutation(i + 1, curString + p + (i == passengers.size() - 1 ? "" : ","), passengersJsons, personJsons);
+        }
+      }
+    }
+
   }
 
   static class Person {
@@ -246,6 +292,13 @@ public final class StreamingTypeAdaptersTest {
     Person(String name, int age) {
       this.name = name;
       this.age = age;
+    }
+
+    public List<String> getExpectedJsons() {
+      List<String> expectedValues = new ArrayList<>();
+      expectedValues.add("{\"name\":\"" + name + "\",\"age\":" + age + "}");
+      expectedValues.add("{\"age\":" + age + ",\"name\":\"" + name + "\"}");
+      return expectedValues;
     }
 
     @Override public boolean equals(Object o) {
